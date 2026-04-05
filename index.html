@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SECURITY MONITOR</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            color: #ff3333;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+        
+        #map {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: #0a0a0a;
+            filter: contrast(1.2) brightness(0.8);
+        }
+        
+        .leaflet-container {
+            background: #000;
+        }
+        
+        .overlay {
+            position: fixed;
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        .header {
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(180deg, rgba(0,0,0,0.95) 0%, transparent 100%);
+            padding: 20px;
+            border-bottom: 2px solid #ff0000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 0 20px rgba(255,0,0,0.3);
+        }
+        
+        .title {
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000;
+            animation: blink 0.5s infinite;
+            letter-spacing: 3px;
+        }
+        
+        .status {
+            font-size: 16px;
+            color: #ff6666;
+            text-shadow: 0 0 10px #ff0000;
+            text-align: right;
+        }
+        
+        .stats-panel {
+            top: 100px;
+            left: 20px;
+            background: rgba(0,0,0,0.9);
+            border: 1px solid #ff0000;
+            padding: 20px;
+            width: 320px;
+            pointer-events: auto;
+            box-shadow: 0 0 30px rgba(255,0,0,0.2);
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 12px 0;
+            font-size: 14px;
+            border-bottom: 1px solid rgba(255,0,0,0.2);
+            padding-bottom: 5px;
+        }
+        
+        .stat-value {
+            color: #ff3333;
+            font-weight: bold;
+            text-shadow: 0 0 10px #ff0000;
+            font-size: 16px;
+        }
+        
+        .log-panel {
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            height: 180px;
+            background: rgba(0,0,0,0.95);
+            border: 1px solid #ff0000;
+            overflow: hidden;
+            pointer-events: auto;
+            box-shadow: 0 0 30px rgba(255,0,0,0.3);
+        }
+        
+        .log-content {
+            padding: 15px;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+        
+        .log-entry {
+            margin: 3px 0;
+            opacity: 0;
+            animation: fadeIn 0.3s forwards;
+            border-left: 3px solid #ff0000;
+            padding-left: 10px;
+        }
+        
+        .attack-meteor {
+            position: absolute;
+            pointer-events: none;
+            z-index: 50;
+        }
+        
+        .meteor-head {
+            width: 12px;
+            height: 12px;
+            background: radial-gradient(circle, #ffffff 0%, #ffff00 30%, #ff6600 60%, #ff0000 100%);
+            border-radius: 50%;
+            box-shadow: 
+                0 0 20px 5px rgba(255, 100, 0, 0.8),
+                0 0 40px 10px rgba(255, 0, 0, 0.6),
+                0 0 60px 20px rgba(255, 0, 0, 0.4);
+            position: absolute;
+            z-index: 52;
+        }
+        
+        .meteor-tail {
+            position: absolute;
+            height: 4px;
+            background: linear-gradient(90deg, 
+                rgba(255,255,255,0) 0%, 
+                rgba(255,200,0,0.3) 20%, 
+                rgba(255,100,0,0.6) 50%, 
+                rgba(255,0,0,0.9) 80%, 
+                rgba(255,0,0,1) 100%);
+            border-radius: 2px;
+            box-shadow: 0 0 10px rgba(255,100,0,0.8);
+            transform-origin: left center;
+            z-index: 51;
+        }
+        
+        .impact-ring {
+            position: absolute;
+            border: 2px solid rgba(255,0,0,0.8);
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(255,0,0,0.6), inset 0 0 20px rgba(255,0,0,0.4);
+            animation: expand 1s ease-out forwards;
+            pointer-events: none;
+            z-index: 49;
+        }
+        
+        @keyframes expand {
+            0% {
+                width: 10px;
+                height: 10px;
+                opacity: 1;
+                margin-left: -5px;
+                margin-top: -5px;
+            }
+            100% {
+                width: 200px;
+                height: 200px;
+                opacity: 0;
+                margin-left: -100px;
+                margin-top: -100px;
+            }
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+        
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+        
+        .alert-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, transparent 0%, rgba(255,0,0,0.1) 100%);
+            z-index: 90;
+            pointer-events: none;
+            animation: alertPulse 2s infinite;
+        }
+        
+        @keyframes alertPulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.6; }
+        }
+        
+        .grid-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(255,0,0,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,0,0,0.05) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: 50;
+            pointer-events: none;
+        }
+        
+        .gauge {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            width: 250px;
+            background: rgba(0,0,0,0.9);
+            border: 1px solid #ff0000;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(255,0,0,0.2);
+        }
+        
+        .gauge-bar {
+            width: 100%;
+            height: 25px;
+            background: #1a0000;
+            margin: 8px 0;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #330000;
+        }
+        
+        .gauge-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ff6600, #ffff00);
+            width: 0%;
+            transition: width 0.5s;
+            box-shadow: 0 0 20px rgba(255,100,0,0.8);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .gauge-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+            animation: shimmer 1s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        .gauge-label {
+            font-size: 12px;
+            margin-bottom: 5px;
+            color: #ff6666;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="grid-overlay"></div>
+    <div class="alert-overlay"></div>
+    
+    <div class="overlay header">
+        <div class="title">⚠ CRITICAL ALERT ⚠</div>
+        <div class="status">
+            DDOS ATTACK IN PROGRESS<br>
+            TARGET: BEIJING SERVER [39.9042°N, 116.4074°E]
+        </div>
+    </div>
+    
+    <div class="overlay stats-panel">
+        <div class="stat-row">
+            <span>ATTACK VOLUME:</span>
+            <span class="stat-value" id="power">847.2 Gbps</span>
+        </div>
+        <div class="stat-row">
+            <span>PACKETS/SEC:</span>
+            <span class="stat-value" id="packets">2.4M pps</span>
+        </div>
+        <div class="stat-row">
+            <span>ACTIVE NODES:</span>
+            <span class="stat-value" id="nodes">15,847</span>
+        </div>
+        <div class="stat-row">
+            <span>ATTACK VECTOR:</span>
+            <span class="stat-value">VOLUMETRIC</span>
+        </div>
+        <div class="stat-row">
+            <span>DURATION:</span>
+            <span class="stat-value" id="duration">00:14:32</span>
+        </div>
+        <div class="stat-row">
+            <span>THREAT LEVEL:</span>
+            <span class="stat-value" style="color: #ff0000; font-size: 20px;">CRITICAL</span>
+        </div>
+    </div>
+    
+    <div class="overlay gauge">
+        <div class="gauge-label">CPU UTILIZATION</div>
+        <div class="gauge-bar">
+            <div class="gauge-fill" id="cpu-gauge" style="width: 98%;"></div>
+        </div>
+        <div class="gauge-label">MEMORY USAGE</div>
+        <div class="gauge-bar">
+            <div class="gauge-fill" id="mem-gauge" style="width: 87%;"></div>
+        </div>
+        <div class="gauge-label">BANDWIDTH SATURATION</div>
+        <div class="gauge-bar">
+            <div class="gauge-fill" id="bw-gauge" style="width: 99%;"></div>
+        </div>
+    </div>
+    
+    <div class="overlay log-panel">
+        <div class="log-content" id="log"></div>
+    </div>
+
+    <script>
+        const map = L.map('map', {
+            zoomControl: true,
+            attributionControl: false
+        }).setView([35, 80], 3);
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            opacity: 0.8
+        }).addTo(map);
+        
+        const beijing = [39.9042, 116.4074];
+        
+        // 世界中の攻撃源を拡張
+        const attackSources = [
+            [37.7749, -122.4194], // San Francisco
+            [40.7128, -74.0060],  // New York
+            [51.5074, -0.1278],   // London
+            [48.8566, 2.3522],    // Paris
+            [55.7558, 37.6173],   // Moscow
+            [35.6762, 139.6503],  // Tokyo
+            [52.5200, 13.4050],   // Berlin
+            [41.9028, 12.4964],   // Rome
+            [1.3521, 103.8198],   // Singapore
+            [-33.8688, 151.2093], // Sydney
+            [19.0760, 72.8777],   // Mumbai
+            [-23.5505, -46.6333], // Sao Paulo
+            [43.6532, -79.3832],  // Toronto
+            [59.9139, 10.7522],   // Oslo
+            [25.2048, 55.2708],   // Dubai
+            [-1.2921, 36.8219],   // Nairobi
+            [13.7563, 100.5018],  // Bangkok
+            [31.2304, 121.4737],  // Shanghai
+            [37.5665, 126.9780],  // Seoul
+            [14.5995, 120.9842],  // Manila
+            [-6.2088, 106.8456],  // Jakarta
+            [3.1390, 101.6869],   // Kuala Lumpur
+            [34.0522, -118.2437], // Los Angeles
+            [49.2827, -123.1207], // Vancouver
+            [45.4642, 9.1900],    // Milan
+            [52.2297, 21.0122],   // Warsaw
+            [47.4979, 19.0402],   // Budapest
+            [50.0755, 14.4378],   // Prague
+            [59.3293, 18.0686],   // Stockholm
+            [60.1699, 24.9384]    // Helsinki
+        ];
+        
+        // 北京にターゲットマーカー（パルス効果）
+        const targetIcon = L.divIcon({
+            className: 'target-marker',
+            html: '<div style="width:30px;height:30px;background:rgba(255,0,0,0.8);border-radius:50%;box-shadow:0 0 30px 10px rgba(255,0,0,0.8);animation:pulse 1s infinite;border:3px solid #fff;"></div>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+        });
+        
+        L.marker(beijing, {icon: targetIcon}).addTo(map);
+        
+        // メテオ（光の玉）クラス
+        class Meteor {
+            constructor() {
+                this.source = attackSources[Math.floor(Math.random() * attackSources.length)];
+                this.progress = 0;
+                this.speed = 0.005 + Math.random() * 0.01;
+                this.element = document.createElement('div');
+                this.element.className = 'attack-meteor';
+                
+                // 尾を作成（複数のセグメントで表現）
+                this.tails = [];
+                const tailLength = 8;
+                for (let i = 0; i < tailLength; i++) {
+                    const tail = document.createElement('div');
+                    tail.className = 'meteor-tail';
+                    tail.style.opacity = 1 - (i / tailLength);
+                    tail.style.width = '30px';
+                    tail.style.height = (4 - i * 0.4) + 'px';
+                    this.element.appendChild(tail);
+                    this.tails.push(tail);
+                }
+                
+                // 頭部（光の玉）
+                this.head = document.createElement('div');
+                this.head.className = 'meteor-head';
+                this.element.appendChild(this.head);
+                
+                document.body.appendChild(this.element);
+                this.history = []; // 軌跡の履歴
+            }
+            
+            update() {
+                this.progress += this.speed;
+                
+                if (this.progress >= 1) {
+                    this.impact();
+                    return false;
+                }
+                
+                // 現在位置を計算（曲線軌道）
+                const lat = this.source[0] + (beijing[0] - this.source[0]) * this.progress;
+                const lng = this.source[1] + (beijing[1] - this.source[1]) * this.progress;
+                
+                // 少しのランダム性で自然な動きを追加
+                const noise = Math.sin(this.progress * Math.PI * 4) * 0.5;
+                const latWithNoise = lat + noise * 0.1;
+                
+                const point = map.latLngToContainerPoint([latWithNoise, lng]);
+                
+                // 履歴を保存（尾の軌跡用）
+                this.history.unshift({x: point.x, y: point.y});
+                if (this.history.length > 15) this.history.pop();
+                
+                // 頭部の位置
+                this.head.style.left = (point.x - 6) + 'px';
+                this.head.style.top = (point.y - 6) + 'px';
+                
+                // 尾の更新
+                for (let i = 0; i < this.tails.length; i++) {
+                    if (this.history[i * 2]) {
+                        const pos = this.history[i * 2];
+                        const prevPos = this.history[i * 2 + 1] || pos;
+                        
+                        const dx = pos.x - prevPos.x;
+                        const dy = pos.y - prevPos.y;
+                        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        this.tails[i].style.left = pos.x + 'px';
+                        this.tails[i].style.top = (pos.y - 2) + 'px';
+                        this.tails[i].style.width = Math.max(20, dist * 3) + 'px';
+                        this.tails[i].style.transform = `rotate(${angle}deg)`;
+                    }
+                }
+                
+                return true;
+            }
+            
+            impact() {
+                // 衝撃波エフェクト
+                const impact = document.createElement('div');
+                impact.className = 'impact-ring';
+                const point = map.latLngToContainerPoint(beijing);
+                impact.style.left = point.x + 'px';
+                impact.style.top = point.y + 'px';
+                document.body.appendChild(impact);
+                
+                setTimeout(() => impact.remove(), 1000);
+                this.destroy();
+                addLog();
+            }
+            
+            destroy() {
+                this.element.remove();
+            }
+        }
+        
+        const meteors = [];
+        const maxMeteors = 40;
+        
+        function spawnMeteor() {
+            if (meteors.length < maxMeteors) {
+                meteors.push(new Meteor());
+            }
+        }
+        
+        function updateMeteors() {
+            for (let i = meteors.length - 1; i >= 0; i--) {
+                if (!meteors[i].update()) {
+                    meteors.splice(i, 1);
+                }
+            }
+        }
+        
+        function addLog() {
+            const logs = [
+                "TCP SYN Flood detected from 185.220.101.XXX [USA]",
+                "UDP Amplification attack source: 194.32.107.XXX [RU]",
+                "HTTP Request flood - 150,000 req/s [BOTNET]",
+                "ICMP Flood from compromised IoT devices [GLOBAL]",
+                "DNS Reflection attack detected [EUROPE]",
+                "SSDP Amplification source identified [ASIA]",
+                "NTP Monlist attack packet received [SOUTH AMERICA]",
+                "Memcached reflection payload 10Gbps [AFRICA]",
+                "Connection pool exhausted - Port 443 [CRITICAL]",
+                "Dropping packets - Rate limit exceeded [WARNING]",
+                "Mirai botnet signature detected [JAPAN]",
+                "DNSSEC amplification attack [GERMANY]",
+                "CLDAP reflection detected [UK]",
+                "SNMP amplification source [BRAZIL]",
+                "TFTP amplification attack [AUSTRALIA]"
+            ];
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            const time = new Date().toISOString().split('T')[1].split('.')[0];
+            const log = logs[Math.floor(Math.random() * logs.length)];
+            logEntry.innerHTML = `<span style="color:#ff6666">[${time}]</span> <span style="color:#ffff00">⚠</span> ${log}`;
+            
+            const logContainer = document.getElementById('log');
+            logContainer.insertBefore(logEntry, logContainer.firstChild);
+            
+            while (logContainer.children.length > 25) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+        
+        let startTime = Date.now();
+        function updateStats() {
+            document.getElementById('power').textContent = (800 + Math.random() * 400).toFixed(1) + ' Gbps';
+            document.getElementById('packets').textContent = (2 + Math.random() * 3).toFixed(1) + 'M pps';
+            document.getElementById('nodes').textContent = (15000 + Math.floor(Math.random() * 5000)).toLocaleString();
+            
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const hours = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+            const mins = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            document.getElementById('duration').textContent = `${hours}:${mins}:${secs}`;
+            
+            document.getElementById('cpu-gauge').style.width = (90 + Math.random() * 10) + '%';
+            document.getElementById('mem-gauge').style.width = (80 + Math.random() * 20) + '%';
+            document.getElementById('bw-gauge').style.width = (95 + Math.random() * 5) + '%';
+        }
+        
+        // メインループ
+        setInterval(spawnMeteor, 150);
+        setInterval(updateMeteors, 16); // 60fps
+        
+        setInterval(updateStats, 1000);
+        setInterval(() => {
+            for (let i = 0; i < 3; i++) addLog();
+        }, 1500);
+        
+        // 地図移動時の調整（必要に応じて）
+        map.on('move', () => {
+            // メテオは自動的にコンテナ座標を使用するため特別な処理は不要
+        });
+    </script>
+</body>
+</html>
