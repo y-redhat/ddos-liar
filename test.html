@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -20,7 +20,6 @@
             overflow: hidden;
         }
         
-        /* 縦画面警告 */
         .orientation-warning {
             display: none;
             position: fixed;
@@ -44,14 +43,14 @@
         
         .orientation-warning h1 {
             color: #00ff41;
-            font-size: 24px;
+            font-size: 28px;
             margin-bottom: 20px;
             text-shadow: 0 0 20px #00ff41;
             animation: blink 1s infinite;
         }
         
         .orientation-warning .icon {
-            font-size: 60px;
+            font-size: 80px;
             margin: 20px;
             animation: rotatePhone 2s infinite;
         }
@@ -100,7 +99,7 @@
         }
         
         .title {
-            font-size: 24px;
+            font-size: 26px;
             font-weight: bold;
             text-shadow: 0 0 20px #00ff41, 0 0 40px #00ff41;
             animation: blink 0.3s infinite;
@@ -122,7 +121,7 @@
             background: rgba(0,10,0,0.95);
             border: 2px solid #00ff41;
             padding: 15px;
-            width: 280px;
+            width: 320px;
             pointer-events: auto;
             box-shadow: 0 0 30px rgba(0,255,65,0.3);
             backdrop-filter: blur(5px);
@@ -132,7 +131,7 @@
             display: flex;
             justify-content: space-between;
             margin: 10px 0;
-            font-size: 11px;
+            font-size: 12px;
             border-bottom: 1px solid rgba(0,255,65,0.3);
             padding-bottom: 5px;
         }
@@ -141,7 +140,7 @@
             color: #00ff41;
             font-weight: bold;
             text-shadow: 0 0 10px #00ff41;
-            font-size: 14px;
+            font-size: 15px;
             font-family: 'Courier New', monospace;
         }
         
@@ -159,7 +158,7 @@
         
         .log-content {
             padding: 10px;
-            font-size: 10px;
+            font-size: 11px;
             line-height: 1.6;
         }
         
@@ -290,44 +289,23 @@
             100% { top: 100%; opacity: 0; }
         }
         
-        .target-marker {
-            filter: hue-rotate(90deg) brightness(2);
-        }
-        
-        /* スマホ横画面対応の調整 */
         @media screen and (max-height: 500px) {
-            .header {
-                padding: 10px 15px;
-            }
-            .title {
-                font-size: 18px;
-            }
-            .stats-panel {
-                top: 70px;
-                width: 220px;
-                padding: 10px;
-            }
-            .stat-row {
-                margin: 6px 0;
-                font-size: 9px;
-            }
-            .stat-value {
-                font-size: 11px;
-            }
-            .log-panel {
-                height: 100px;
-            }
+            .header { padding: 10px 15px; }
+            .title { font-size: 20px; }
+            .stats-panel { top: 70px; width: 260px; padding: 10px; }
+            .stat-row { margin: 6px 0; font-size: 10px; }
+            .stat-value { font-size: 12px; }
+            .log-panel { height: 100px; }
         }
     </style>
 </head>
 <body>
-    <!-- 縦画面警告 -->
     <div class="orientation-warning" id="orientationWarning">
-        <h1>⚠ 横画面モード必須 ⚠</h1>
+        <h1>⚠ LANDSCAPE MODE REQUIRED ⚠</h1>
         <div class="icon">📱</div>
         <p style="color: #00ff41; font-size: 16px; margin-top: 20px;">
-            この監視画面は横画面（ランドスケープ）専用です<br>
-            端末を90度回転してください
+            This monitor requires Landscape orientation<br>
+            Please rotate your device 90 degrees
         </p>
     </div>
 
@@ -337,17 +315,17 @@
     <div class="scan-line"></div>
     
     <div class="overlay header">
-        <div class="title">⚠ SYSTEM ALERT ⚠</div>
+        <div class="title">⚠ CRITICAL ALERT ⚠</div>
         <div class="status">
-            NETWORK UNDER ATTACK<br>
-            TARGET: BEIJING [39.9042°N, 116.4074°E]<br>
-            PROTOCOL: DDOS VOLUMETRIC
+            DISTRIBUTED DENIAL OF SERVICE ATTACK<br>
+            TARGET: BEIJING INFRASTRUCTURE [39.9042°N, 116.4074°E]<br>
+            VECTOR: VOLUMETRIC FLOOD
         </div>
     </div>
     
     <div class="overlay stats-panel">
         <div class="stat-row">
-            <span>TRAFFIC LOAD:</span>
+            <span>ATTACK VOLUME:</span>
             <span class="stat-value" id="power">1.4 Tbps</span>
         </div>
         <div class="stat-row">
@@ -359,16 +337,16 @@
             <span class="stat-value" id="nodes">52,847</span>
         </div>
         <div class="stat-row">
-            <span>VECTOR:</span>
+            <span>ATTACK VECTOR:</span>
             <span class="stat-value">MULTI-PROTOCOL</span>
         </div>
         <div class="stat-row">
-            <span>UPTIME:</span>
+            <span>DURATION:</span>
             <span class="stat-value" id="duration">00:00:00</span>
         </div>
         <div class="stat-row">
-            <span>SEVERITY:</span>
-            <span class="stat-value" style="text-shadow: 0 0 20px #ff0000;">CRITICAL</span>
+            <span>THREAT LEVEL:</span>
+            <span class="stat-value" style="color: #ff0000; text-shadow: 0 0 20px #ff0000;">CRITICAL</span>
         </div>
     </div>
     
@@ -377,11 +355,9 @@
     </div>
 
     <script>
-        // 画面方向チェック
         function checkOrientation() {
             const warning = document.getElementById('orientationWarning');
             const isPortrait = window.innerHeight > window.innerWidth;
-            
             if (isPortrait) {
                 warning.classList.add('active');
             } else {
@@ -403,7 +379,6 @@
             boxZoom: true
         }).setView([35, 90], 3);
         
-        // ダーク地図を緑系に変換
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             maxZoom: 19,
             opacity: 0.8,
@@ -412,7 +387,6 @@
         
         const beijing = [39.9042, 116.4074];
         
-        // 世界中の攻撃源
         const majorSources = [
             [37.7749, -122.4194], [40.7128, -74.0060], [34.0522, -118.2437],
             [51.5074, -0.1278], [48.8566, 2.3522], [52.5200, 13.4050],
@@ -438,7 +412,6 @@
             }
         }
         
-        // 北京ターゲット（緑パルス）
         const targetPulse = L.divIcon({
             className: 'target-marker',
             html: '<div style="width:30px;height:30px;background:radial-gradient(circle,rgba(0,255,65,1)0%,rgba(0,200,50,0.8)40%,transparent70%);border-radius:50%;box-shadow:0 0 40px 15px rgba(0,255,65,1);animation:pulseTarget 0.6s infinite;border:2px solid #00ff41;"></div>',
@@ -573,14 +546,14 @@
         
         const attackTypes = [
             "TCP SYN Flood", "UDP Amplification", "HTTP Flood", "ICMP Flood",
-            "DNS Reflection", "SSDP Amplification", "NTP Monlist", "Memcached",
+            "DNS Reflection", "SSDP Amplification", "NTP Monlist", "Memcached Refl.",
             "SNMP Reflection", "Connection Flood", "Slowloris", "ACK Flood"
         ];
         
         const countries = [
             "USA", "RUSSIA", "BRAZIL", "INDIA", "GERMANY", "UK", 
             "FRANCE", "JAPAN", "KOREA", "CANADA", "AUSTRALIA", "UKRAINE",
-            "NORTH_KOREA", "IRAN", "TURKEY", "EGYPT", "NIGERIA", "INDONESIA",
+            "N.KOREA", "IRAN", "TURKEY", "EGYPT", "NIGERIA", "INDONESIA",
             "VIETNAM", "THAILAND", "PHILIPPINES", "NETHERLANDS", "SWEDEN"
         ];
         
@@ -597,7 +570,7 @@
                 <span style="color:#00ff41">[${time}]</span> 
                 <span style="color:#00cc00">${type}</span> 
                 <span style="color:#00aa00">◄</span> 
-                ${ip} [${country}] 
+                SRC: ${ip} [${country}] 
                 <span style="color:#00ff41">${size}Gbps</span>
             `;
             
