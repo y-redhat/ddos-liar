@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SECURITY MONITOR</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+        
+        /* 縦画面警告 */
+        .orientation-warning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 9999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            border: 3px solid #00ff41;
+        }
+        
+        .orientation-warning.active {
+            display: flex;
+        }
+        
+        .orientation-warning h1 {
+            color: #00ff41;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #00ff41;
+            animation: blink 1s infinite;
+        }
+        
+        .orientation-warning .icon {
+            font-size: 60px;
+            margin: 20px;
+            animation: rotatePhone 2s infinite;
+        }
+        
+        @keyframes rotatePhone {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+        }
+        
+        #map {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: #000;
+            filter: contrast(1.5) brightness(0.4) sepia(1) hue-rotate(90deg) saturate(3);
+        }
+        
+        .leaflet-container {
+            background: #000 !important;
+        }
+        
+        .leaflet-layer {
+            filter: invert(1) hue-rotate(180deg) brightness(0.6) contrast(1.5) sepia(1) hue-rotate(50deg) saturate(5);
+        }
+        
+        .overlay {
+            position: fixed;
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        .header {
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(180deg, rgba(0,20,0,0.98) 0%, rgba(0,20,0,0.8) 50%, transparent 100%);
+            padding: 15px 25px;
+            border-bottom: 3px solid #00ff41;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 0 30px rgba(0,255,65,0.5);
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 20px #00ff41, 0 0 40px #00ff41;
+            animation: blink 0.3s infinite;
+            letter-spacing: 3px;
+            color: #00ff41;
+        }
+        
+        .status {
+            font-size: 12px;
+            color: #00cc33;
+            text-shadow: 0 0 10px #00ff41;
+            text-align: right;
+            line-height: 1.5;
+        }
+        
+        .stats-panel {
+            top: 90px;
+            left: 15px;
+            background: rgba(0,10,0,0.95);
+            border: 2px solid #00ff41;
+            padding: 15px;
+            width: 280px;
+            pointer-events: auto;
+            box-shadow: 0 0 30px rgba(0,255,65,0.3);
+            backdrop-filter: blur(5px);
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 11px;
+            border-bottom: 1px solid rgba(0,255,65,0.3);
+            padding-bottom: 5px;
+        }
+        
+        .stat-value {
+            color: #00ff41;
+            font-weight: bold;
+            text-shadow: 0 0 10px #00ff41;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .log-panel {
+            bottom: 15px;
+            left: 15px;
+            right: 15px;
+            height: 140px;
+            background: rgba(0,10,0,0.95);
+            border: 2px solid #00ff41;
+            overflow: hidden;
+            pointer-events: auto;
+            box-shadow: 0 0 30px rgba(0,255,65,0.3);
+        }
+        
+        .log-content {
+            padding: 10px;
+            font-size: 10px;
+            line-height: 1.6;
+        }
+        
+        .log-entry {
+            margin: 3px 0;
+            opacity: 0;
+            animation: fadeIn 0.3s forwards;
+            border-left: 3px solid #00ff41;
+            padding-left: 8px;
+            background: rgba(0,255,65,0.05);
+            padding: 3px 3px 3px 8px;
+        }
+        
+        .attack-meteor {
+            position: absolute;
+            pointer-events: none;
+            z-index: 50;
+        }
+        
+        .meteor-head {
+            width: 6px;
+            height: 6px;
+            background: radial-gradient(circle, #ffffff 0%, #ccffcc 20%, #00ff41 50%, #00cc00 100%);
+            border-radius: 50%;
+            box-shadow: 
+                0 0 20px 5px rgba(0, 255, 65, 1),
+                0 0 40px 10px rgba(0, 200, 50, 0.8),
+                0 0 60px 15px rgba(0, 150, 30, 0.6);
+            position: absolute;
+            z-index: 52;
+        }
+        
+        .meteor-tail {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(90deg, 
+                rgba(0,255,65,0) 0%, 
+                rgba(100,255,100,0.4) 10%, 
+                rgba(0,255,65,0.7) 30%, 
+                rgba(0,200,50,0.9) 60%, 
+                rgba(0,150,0,1) 100%);
+            border-radius: 1px;
+            box-shadow: 0 0 10px rgba(0,255,65,1);
+            transform-origin: left center;
+            z-index: 51;
+        }
+        
+        .impact-ring {
+            position: absolute;
+            border: 2px solid rgba(0,255,65,0.9);
+            border-radius: 50%;
+            box-shadow: 
+                0 0 20px rgba(0,255,65,1), 
+                inset 0 0 20px rgba(0,200,50,0.6);
+            animation: expand 1.2s ease-out forwards;
+            pointer-events: none;
+            z-index: 49;
+        }
+        
+        @keyframes expand {
+            0% {
+                width: 5px;
+                height: 5px;
+                opacity: 1;
+                margin-left: -2.5px;
+                margin-top: -2.5px;
+            }
+            100% {
+                width: 250px;
+                height: 250px;
+                opacity: 0;
+                margin-left: -125px;
+                margin-top: -125px;
+            }
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+        
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+        
+        .grid-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0,255,65,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,65,0.1) 1px, transparent 1px);
+            background-size: 25px 25px;
+            z-index: 50;
+            pointer-events: none;
+        }
+        
+        .vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, transparent 20%, rgba(0,20,0,0.9) 100%);
+            z-index: 90;
+            pointer-events: none;
+        }
+        
+        .scan-line {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: rgba(0,255,65,0.5);
+            box-shadow: 0 0 20px rgba(0,255,65,1);
+            animation: scan 3s linear infinite;
+            z-index: 95;
+            pointer-events: none;
+        }
+        
+        @keyframes scan {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+        
+        .target-marker {
+            filter: hue-rotate(90deg) brightness(2);
+        }
+        
+        /* スマホ横画面対応の調整 */
+        @media screen and (max-height: 500px) {
+            .header {
+                padding: 10px 15px;
+            }
+            .title {
+                font-size: 18px;
+            }
+            .stats-panel {
+                top: 70px;
+                width: 220px;
+                padding: 10px;
+            }
+            .stat-row {
+                margin: 6px 0;
+                font-size: 9px;
+            }
+            .stat-value {
+                font-size: 11px;
+            }
+            .log-panel {
+                height: 100px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 縦画面警告 -->
+    <div class="orientation-warning" id="orientationWarning">
+        <h1>⚠ 横画面モード必須 ⚠</h1>
+        <div class="icon">📱</div>
+        <p style="color: #00ff41; font-size: 16px; margin-top: 20px;">
+            この監視画面は横画面（ランドスケープ）専用です<br>
+            端末を90度回転してください
+        </p>
+    </div>
+
+    <div id="map"></div>
+    <div class="grid-overlay"></div>
+    <div class="vignette"></div>
+    <div class="scan-line"></div>
+    
+    <div class="overlay header">
+        <div class="title">⚠ SYSTEM ALERT ⚠</div>
+        <div class="status">
+            NETWORK UNDER ATTACK<br>
+            TARGET: BEIJING [39.9042°N, 116.4074°E]<br>
+            PROTOCOL: DDOS VOLUMETRIC
+        </div>
+    </div>
+    
+    <div class="overlay stats-panel">
+        <div class="stat-row">
+            <span>TRAFFIC LOAD:</span>
+            <span class="stat-value" id="power">1.4 Tbps</span>
+        </div>
+        <div class="stat-row">
+            <span>PACKET RATE:</span>
+            <span class="stat-value" id="packets">5.2M pps</span>
+        </div>
+        <div class="stat-row">
+            <span>BOTNET NODES:</span>
+            <span class="stat-value" id="nodes">52,847</span>
+        </div>
+        <div class="stat-row">
+            <span>VECTOR:</span>
+            <span class="stat-value">MULTI-PROTOCOL</span>
+        </div>
+        <div class="stat-row">
+            <span>UPTIME:</span>
+            <span class="stat-value" id="duration">00:00:00</span>
+        </div>
+        <div class="stat-row">
+            <span>SEVERITY:</span>
+            <span class="stat-value" style="text-shadow: 0 0 20px #ff0000;">CRITICAL</span>
+        </div>
+    </div>
+    
+    <div class="overlay log-panel">
+        <div class="log-content" id="log"></div>
+    </div>
+
+    <script>
+        // 画面方向チェック
+        function checkOrientation() {
+            const warning = document.getElementById('orientationWarning');
+            const isPortrait = window.innerHeight > window.innerWidth;
+            
+            if (isPortrait) {
+                warning.classList.add('active');
+            } else {
+                warning.classList.remove('active');
+            }
+        }
+        
+        window.addEventListener('resize', checkOrientation);
+        window.addEventListener('orientationchange', checkOrientation);
+        checkOrientation();
+        
+        const map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false,
+            dragging: true,
+            touchZoom: true,
+            scrollWheelZoom: true,
+            doubleClickZoom: true,
+            boxZoom: true
+        }).setView([35, 90], 3);
+        
+        // ダーク地図を緑系に変換
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            opacity: 0.8,
+            subdomains: 'abcd'
+        }).addTo(map);
+        
+        const beijing = [39.9042, 116.4074];
+        
+        // 世界中の攻撃源
+        const majorSources = [
+            [37.7749, -122.4194], [40.7128, -74.0060], [34.0522, -118.2437],
+            [51.5074, -0.1278], [48.8566, 2.3522], [52.5200, 13.4050],
+            [55.7558, 37.6173], [59.9311, 30.3609], [53.9045, 27.5615],
+            [35.6762, 139.6503], [37.5665, 126.9780], [13.7563, 100.5018],
+            [1.3521, 103.8198], [-33.8688, 151.2093], [-37.8136, 144.9631],
+            [19.0760, 72.8777], [28.6139, 77.2090], [31.2304, 121.4737],
+            [-23.5505, -46.6333], [-34.6037, -58.3816], [-33.4489, -70.6693],
+            [14.5995, 120.9842], [3.1390, 101.6869], [10.8231, 106.6297],
+            [41.0082, 28.9784], [25.2048, 55.2708], [35.6892, 51.3890],
+            [-1.2921, 36.8219], [6.5244, 3.3792], [-26.2041, 28.0473],
+            [52.2297, 21.0122], [47.4979, 19.0402], [50.0755, 14.4378],
+            [59.9139, 10.7522], [55.6761, 12.5683], [60.1699, 24.9384]
+        ];
+        
+        function getRandomSource() {
+            if (Math.random() > 0.4) {
+                return majorSources[Math.floor(Math.random() * majorSources.length)];
+            } else {
+                const lat = (Math.random() - 0.5) * 160;
+                const lng = (Math.random() - 0.5) * 360;
+                return [lat, lng];
+            }
+        }
+        
+        // 北京ターゲット（緑パルス）
+        const targetPulse = L.divIcon({
+            className: 'target-marker',
+            html: '<div style="width:30px;height:30px;background:radial-gradient(circle,rgba(0,255,65,1)0%,rgba(0,200,50,0.8)40%,transparent70%);border-radius:50%;box-shadow:0 0 40px 15px rgba(0,255,65,1);animation:pulseTarget 0.6s infinite;border:2px solid #00ff41;"></div>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+        });
+        
+        L.marker(beijing, {icon: targetPulse}).addTo(map);
+        
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes pulseTarget {
+                0% { transform: scale(1); opacity: 1; }
+                50% { transform: scale(1.5); opacity: 0.7; }
+                100% { transform: scale(1); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        class Meteor {
+            constructor() {
+                this.source = getRandomSource();
+                this.progress = 0;
+                this.speed = 0.002 + Math.random() * 0.01;
+                this.curve = (Math.random() - 0.5) * 0.8;
+                this.element = document.createElement('div');
+                this.element.className = 'attack-meteor';
+                
+                this.tails = [];
+                const tailCount = 10;
+                for (let i = 0; i < tailCount; i++) {
+                    const tail = document.createElement('div');
+                    tail.className = 'meteor-tail';
+                    tail.style.opacity = Math.pow(1 - (i / tailCount), 1.5);
+                    tail.style.width = '40px';
+                    tail.style.height = Math.max(1, 3 - i * 0.25) + 'px';
+                    this.element.appendChild(tail);
+                    this.tails.push(tail);
+                }
+                
+                this.head = document.createElement('div');
+                this.head.className = 'meteor-head';
+                this.element.appendChild(this.head);
+                
+                document.body.appendChild(this.element);
+                this.history = [];
+                this.maxHistory = 15;
+            }
+            
+            getBezierPoint(t, p0, p1, p2) {
+                const x = (1-t)*(1-t)*p0[0] + 2*(1-t)*t*p1[0] + t*t*p2[0];
+                const y = (1-t)*(1-t)*p0[1] + 2*(1-t)*t*p1[1] + t*t*p2[1];
+                return [x, y];
+            }
+            
+            update() {
+                this.progress += this.speed;
+                
+                if (this.progress >= 1) {
+                    this.impact();
+                    return false;
+                }
+                
+                const midLat = (this.source[0] + beijing[0]) / 2 + this.curve * 30;
+                const midLng = (this.source[1] + beijing[1]) / 2 + this.curve * 30;
+                
+                const pos = this.getBezierPoint(this.progress, this.source, [midLat, midLng], beijing);
+                const point = map.latLngToContainerPoint(pos);
+                
+                this.history.unshift({x: point.x, y: point.y});
+                if (this.history.length > this.maxHistory) this.history.pop();
+                
+                this.head.style.left = (point.x - 3) + 'px';
+                this.head.style.top = (point.y - 3) + 'px';
+                
+                for (let i = 0; i < this.tails.length; i++) {
+                    const idx = Math.floor(i * (this.history.length / this.tails.length));
+                    if (this.history[idx] && this.history[idx + 1]) {
+                        const current = this.history[idx];
+                        const next = this.history[idx + 1];
+                        const dx = next.x - current.x;
+                        const dy = next.y - current.y;
+                        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        this.tails[i].style.left = current.x + 'px';
+                        this.tails[i].style.top = (current.y - 1) + 'px';
+                        this.tails[i].style.width = Math.max(20, dist * 4) + 'px';
+                        this.tails[i].style.transform = `rotate(${angle}deg)`;
+                    }
+                }
+                
+                return true;
+            }
+            
+            impact() {
+                const point = map.latLngToContainerPoint(beijing);
+                for (let i = 0; i < 2; i++) {
+                    setTimeout(() => {
+                        const impact = document.createElement('div');
+                        impact.className = 'impact-ring';
+                        impact.style.left = point.x + 'px';
+                        impact.style.top = point.y + 'px';
+                        document.body.appendChild(impact);
+                        setTimeout(() => impact.remove(), 1200);
+                    }, i * 150);
+                }
+                this.destroy();
+                addLog();
+            }
+            
+            destroy() {
+                this.element.remove();
+            }
+        }
+        
+        const meteors = [];
+        
+        function spawnMeteor() {
+            if (meteors.length < 50) {
+                meteors.push(new Meteor());
+            }
+        }
+        
+        function updateMeteors() {
+            for (let i = meteors.length - 1; i >= 0; i--) {
+                if (!meteors[i].update()) {
+                    meteors.splice(i, 1);
+                }
+            }
+        }
+        
+        const attackTypes = [
+            "TCP SYN Flood", "UDP Amplification", "HTTP Flood", "ICMP Flood",
+            "DNS Reflection", "SSDP Amplification", "NTP Monlist", "Memcached",
+            "SNMP Reflection", "Connection Flood", "Slowloris", "ACK Flood"
+        ];
+        
+        const countries = [
+            "USA", "RUSSIA", "BRAZIL", "INDIA", "GERMANY", "UK", 
+            "FRANCE", "JAPAN", "KOREA", "CANADA", "AUSTRALIA", "UKRAINE",
+            "NORTH_KOREA", "IRAN", "TURKEY", "EGYPT", "NIGERIA", "INDONESIA",
+            "VIETNAM", "THAILAND", "PHILIPPINES", "NETHERLANDS", "SWEDEN"
+        ];
+        
+        function addLog() {
+            const type = attackTypes[Math.floor(Math.random() * attackTypes.length)];
+            const country = countries[Math.floor(Math.random() * countries.length)];
+            const ip = `${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.XXX.XXX`;
+            const size = (Math.random() * 8 + 2).toFixed(1);
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            const time = new Date().toISOString().split('T')[1].split('.')[0];
+            logEntry.innerHTML = `
+                <span style="color:#00ff41">[${time}]</span> 
+                <span style="color:#00cc00">${type}</span> 
+                <span style="color:#00aa00">◄</span> 
+                ${ip} [${country}] 
+                <span style="color:#00ff41">${size}Gbps</span>
+            `;
+            
+            const logContainer = document.getElementById('log');
+            logContainer.insertBefore(logEntry, logContainer.firstChild);
+            
+            while (logContainer.children.length > 20) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+        
+        let startTime = Date.now();
+        function updateStats() {
+            document.getElementById('power').textContent = (800 + Math.random() * 600).toFixed(1) + ' Gbps';
+            document.getElementById('packets').textContent = (3 + Math.random() * 4).toFixed(1) + 'M pps';
+            document.getElementById('nodes').textContent = Math.floor(40000 + Math.random() * 20000).toLocaleString();
+            
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const hours = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+            const mins = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            document.getElementById('duration').textContent = `${hours}:${mins}:${secs}`;
+        }
+        
+        setInterval(() => {
+            const burst = Math.floor(Math.random() * 4) + 1;
+            for (let i = 0; i < burst; i++) {
+                setTimeout(spawnMeteor, i * 60);
+            }
+        }, 250);
+        
+        setInterval(updateMeteors, 16);
+        setInterval(updateStats, 1000);
+        setInterval(() => {
+            for (let i = 0; i < 3; i++) addLog();
+        }, 1000);
+    </script>
+</body>
+</html>
